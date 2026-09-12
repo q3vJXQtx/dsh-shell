@@ -47,7 +47,7 @@ jobs:
         run: cargo build --release --features custom-protocol
 
   release:
-    name: Installer & draft release
+    name: Installer & release
     if: startsWith(github.ref, 'refs/tags/v')
     needs: ci
     runs-on: windows-latest
@@ -68,7 +68,7 @@ jobs:
       - name: Install npm deps
         run: npm ci
 
-      - name: Tauri build (NSIS) & draft release
+      - name: Tauri build (NSIS) & release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -76,7 +76,7 @@ jobs:
           projectPath: .
           tagName: ${{ github.ref_name }}
           releaseName: "DSH Shell ${{ github.ref_name }}"
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
 
       # tauri 官方没有 "portable" bundle 目标；但 tauri build 产出的

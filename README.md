@@ -135,7 +135,7 @@ cd src-tauri && cargo test --lib   # 跑测试（含 capability 权限守卫）
 | 触发 | 内容 |
 |---|---|
 | push `main` / PR | `tsc + vite build` → `cargo test --lib` → release 编译 |
-| 推送 `v*` tag | CI 通过后产出 NSIS 安装包，自动创建 **draft Release** |
+| 推送 `v*` tag | CI 通过后产出 NSIS 安装包 + 单文件便携版，自动创建并发布 Release |
 
 全部跑在 `windows-latest`，见 [`.github/workflows/build.yml`](.github/workflows/build.yml)。
 
