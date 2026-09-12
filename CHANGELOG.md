@@ -30,7 +30,7 @@
   （含预发布后缀）、代理回退链，命中时给出复制即用的升级命令
 - **诊断导出** —— 状态 / 日志 / 设置 / 进程与命令行 / 运行时目录聚合一份报告落盘
 - **CI** —— GitHub Actions：`main`/PR 自动构建与测试；`v*` tag 产出
-  NSIS 安装包并创建 draft Release
+  NSIS 安装包（`DSH.Shell_<版本>_x64-setup.exe`）并创建 draft Release
 
 ### Security
 
@@ -39,3 +39,6 @@
 
 [Unreleased]: https://github.com/q3vJXQtx/dsh-shell/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/q3vJXQtx/dsh-shell/releases/tag/v0.1.0
+
+> 注：v0.1.0 的 Release 目前为 **draft**（待人工核对后发布），
+> 发布前资产可从 CI run 的产物页直接下载。
