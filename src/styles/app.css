@@ -1,0 +1,730 @@
+/* ===========================================================================
+   DSH Shell —— 控制台样式
+   跟随系统深浅色；用 CSS 变量集中管理，便于统一调整。
+   =========================================================================== */
+
+:root {
+  --bg: #ffffff;
+  --bg-subtle: #f6f7f9;
+  --bg-elevated: #ffffff;
+  --border: #e3e6ea;
+  --border-strong: #cdd3da;
+  --text: #1c2128;
+  --text-dim: #5b6672;
+  --text-faint: #8b95a1;
+  --accent: #2f6feb;
+  --accent-soft: #eaf1fe;
+  --ok: #1a7f4b;
+  --ok-soft: #e7f5ee;
+  --warn: #9a6700;
+  --warn-soft: #fff5d6;
+  --err: #b42318;
+  --err-soft: #fdecea;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181d;
+    --bg-subtle: #1c1f26;
+    --bg-elevated: #21242c;
+    --border: #2e323b;
+    --border-strong: #3d434e;
+    --text: #e6e9ef;
+    --text-dim: #a2acba;
+    --text-faint: #6f7987;
+    --accent: #6a9bff;
+    --accent-soft: #1e2a44;
+    --ok: #57c98a;
+    --ok-soft: #172a21;
+    --warn: #e0b341;
+    --warn-soft: #2c2616;
+    --err: #ff8078;
+    --err-soft: #2f1d1c;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--bg);
+  /* 桌面应用不应有文本选择与拖拽行为（输入框除外） */
+  user-select: none;
+  overflow: hidden;
+}
+
+input,
+textarea {
+  user-select: text;
+}
+
+/* ---------- 布局 ---------- */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  height: 44px;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+
+.header .brand {
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.header .spacer {
+  flex: 1;
+}
+
+.main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 原生子 WebView 覆盖的区域：本身不放内容，只用来量尺寸 */
+.chat-host {
+  position: absolute;
+  inset: 0;
+}
+
+/* 未就绪时盖在 chat-host 之上的引导界面 */
+.overlay {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  background: var(--bg);
+  padding: 28px 32px;
+}
+
+/* ---------- 通用控件 ---------- */
+
+button {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+button:hover:not(:disabled) {
+  background: var(--bg-subtle);
+  border-color: var(--text-faint);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+button.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+  background: var(--accent);
+}
+
+button.ghost {
+  background: transparent;
+  border-color: transparent;
+}
+
+button.ghost:hover:not(:disabled) {
+  background: var(--bg-subtle);
+}
+
+/* 破坏性操作（接管会终止另一个进程）：用错误色，视觉上区别于普通主按钮 */
+button.primary.danger {
+  background: var(--err);
+  border-color: var(--err);
+  color: #fff;
+}
+
+/* ---------- 顶部提示条 ---------- */
+/* 用于"操作没成功"这类必须让用户看到的反馈。
+   之所以不用 alert()：原生对话框在整个 WebView 上会阻塞渲染，
+   也可能被环境静默忽略，反而让用户以为按钮没反应。 */
+/* 横幅的堆叠容器。
+   单条 .notice 是自带绝对定位的，两条同时出现（比如"接管被拦下"和
+   "DSH 有新版本"）会精确地互相盖住。统一收进容器里由 flex 排列，
+   就不必为每种组合各调一次 top 值。 */
+.notices {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: min(720px, calc(100% - 40px));
+}
+
+.notices .notice {
+  position: static;
+  left: auto;
+  transform: none;
+  max-width: 100%;
+}
+
+/* 信息型横幅（如"DSH 有新版本"）：蓝色，与红色的错误横幅区分开 */
+.notice.info {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* 命令片段（如升级命令）。横幅和设置面板里都会用到，故不限定父级。 */
+.cmd {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+/* 设置面板里的分区分隔线 */
+hr.sep {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+
+.notice {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(720px, calc(100% - 40px));
+  padding: 9px 12px;
+  border: 1px solid var(--err);
+  border-radius: var(--radius);
+  background: var(--err-soft);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 18%);
+}
+
+.notice .spacer {
+  flex: 1;
+}
+
+/* 二次确认时的说明文字，跟按钮排在同一行 */
+.confirm-hint {
+  align-self: center;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+input[type="text"],
+input[type="number"] {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  width: 100%;
+}
+
+input:focus {
+  outline: 2px solid var(--accent-soft);
+  border-color: var(--accent);
+}
+
+/* ---------- 状态徽章 ---------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.badge.ok {
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+.badge.warn {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+.badge.err {
+  color: var(--err);
+  background: var(--err-soft);
+}
+.badge.idle {
+  color: var(--text-dim);
+  background: var(--bg-subtle);
+}
+
+.badge .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badge.warn .dot,
+.badge.ok .dot {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* ---------- 启动阶段 ---------- */
+
+.panel {
+  max-width: 620px;
+}
+
+.panel h2 {
+  font-size: 15px;
+  margin: 0 0 6px;
+}
+
+.panel .lead {
+  color: var(--text-dim);
+  margin: 0 0 20px;
+}
+
+.phases {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+}
+
+.phases li {
+  display: flex;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.phases li:last-child {
+  border-bottom: none;
+}
+
+.phases .marker {
+  flex: 0 0 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.phases li.done .marker {
+  border-color: var(--ok);
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.phases li.active .marker {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.phases .name {
+  font-weight: 500;
+}
+
+.phases li:not(.active):not(.done) .name {
+  color: var(--text-faint);
+}
+
+.phases .hint {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+/* ---------- 失败引导 ---------- */
+
+.failure {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--err);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+
+.failure h2 {
+  color: var(--err);
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.failure .detail {
+  color: var(--text-dim);
+  margin: 0 0 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.failure ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-dim);
+}
+
+.failure ul li {
+  margin-bottom: 3px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+/* ---------- 诊断面板 ---------- */
+
+.drawer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  z-index: 10;
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+  flex: 0 0 auto;
+}
+
+.drawer-head .title {
+  font-weight: 600;
+}
+
+.drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 18px;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 4px 12px;
+  margin-bottom: 18px;
+  font-size: 12px;
+}
+
+.kv dt {
+  color: var(--text-faint);
+}
+
+.kv dd {
+  margin: 0;
+  font-family: var(--mono);
+  word-break: break-all;
+  user-select: text;
+}
+
+.logs {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.log-row {
+  display: flex;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  align-items: baseline;
+}
+
+.log-row:last-child {
+  border-bottom: none;
+}
+
+.log-row .at {
+  color: var(--text-faint);
+  flex: 0 0 auto;
+}
+
+.log-row .lvl {
+  flex: 0 0 44px;
+  font-weight: 600;
+}
+
+.log-row.info .lvl {
+  color: var(--accent);
+}
+.log-row.warn .lvl {
+  color: var(--warn);
+}
+.log-row.error .lvl {
+  color: var(--err);
+}
+
+.log-row .txt {
+  flex: 1;
+  user-select: text;
+  word-break: break-word;
+}
+
+.log-row .det {
+  color: var(--text-faint);
+  white-space: pre-wrap;
+  margin-top: 2px;
+  display: block;
+  user-select: text;
+  word-break: break-word;
+}
+
+.empty {
+  color: var(--text-faint);
+  padding: 10px;
+  font-size: 12px;
+}
+
+/* ---------- 设置 ---------- */
+
+.field {
+  margin-bottom: 16px;
+  max-width: 480px;
+}
+
+.field > label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.field .desc {
+  color: var(--text-faint);
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+  max-width: 560px;
+}
+
+.check input {
+  margin-top: 3px;
+}
+
+.check .desc {
+  color: var(--text-faint);
+  font-size: 12px;
+  margin: 2px 0 0;
+}
+
+.note {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  font-size: 12px;
+  max-width: 560px;
+}
+
+/* ---------- 设置：分区卡片 ---------- */
+/* 设置项按「启动 / 行为 / 网络」分组，每组一张卡片。
+   项目多了以后平铺一列让人找不到东西，分组是最省解释成本的组织方式。 */
+
+.settings-section {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  padding: 14px 16px 8px;
+  margin-bottom: 14px;
+  max-width: 720px;
+}
+
+.settings-section > h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.settings-section > .section-desc {
+  color: var(--text-faint);
+  font-size: 12px;
+  margin: 2px 0 12px;
+}
+
+/* 卡片里的字段留白略收紧，视觉上从属于卡片 */
+.settings-section .field {
+  margin-bottom: 12px;
+}
+
+.settings-section .actions {
+  margin: 4px 0 10px;
+}
+
+/* ---------- 设置：滑动开关 ---------- */
+/* 原生 checkbox 保留（可访问性、表单语义），只做视觉隐藏；
+   轨道与滑块全部画在兄弟节点 .track 上。 */
+
+.switch {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 20px;
+  margin-top: 2px;
+}
+
+.switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.switch .track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--border-strong);
+  transition: background 0.15s;
+  pointer-events: none;
+}
+
+.switch .track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
+  transition: transform 0.15s;
+}
+
+.switch input:checked + .track {
+  background: var(--accent);
+}
+
+.switch input:checked + .track::after {
+  transform: translateX(14px);
+}
+
+.switch input:focus-visible + .track {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---------- 设置：分段选择器 ---------- */
+/* 三选一（直连 / 自动探测 / 自定义代理）用分段按钮比 radio 列表省地方也更直观 */
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  width: fit-content;
+}
+
+.seg button {
+  border: none;
+  border-radius: 0;
+  background: var(--bg);
+  padding: 5px 14px;
+  font-size: 12.5px;
+}
+
+.seg button + button {
+  border-left: 1px solid var(--border);
+}
+
+.seg button:hover:not(:disabled) {
+  background: var(--bg-subtle);
+}
+
+.seg button.on {
+  background: var(--accent);
+  color: #fff;
+}
+
+.seg button.on:hover:not(:disabled) {
+  background: var(--accent);
+  filter: brightness(1.08);
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "只授予 React 控制台（本地 shell 视图）权限。聊天视图加载的是远程 DSH 页面，不授予任何权限。",
+  "local": true,
+  "webviews": ["shell"],
+  "windows": [],
+  "permissions": [
+    "core:default",
+    "opener:default"
+  ]
+}

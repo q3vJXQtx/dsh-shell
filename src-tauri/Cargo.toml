@@ -1,0 +1,97 @@
+[package]
+name = "dsh-shell"
+version = "0.1.0"
+description = "DSH Desktop Shell - a diagnostics-first Windows shell for DeepSeek Harness"
+authors = ["dsh-shell"]
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "dsh_shell_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+# Tauri 的「开发/发布」总开关。
+#
+# `tauri` 自己的 build.rs 里是这样判定的：
+#
+# ```ignore
+# let custom_protocol = has_feature("custom-protocol");
+# let dev = !custom_protocol;          // 没有这个 feature 就是 dev 模式
+# ```
+#
+# **踩过的坑**：`tauri` 是依赖而非本 crate 的 feature，如果这里不声明，
+# 直接 `cargo build --release` 出来的二进制虽然编译期是 release，
+# 运行期却仍然处于 dev 模式 —— 它会去加载 `devUrl`（Vite 的 1420 端口），
+# 而没有 dev server 时窗口就是**一片空白**，且日志里只显示
+# "控制台页面开始加载 http://localhost:1420/" 这种看似正常的记录。
+#
+# 正规做法是走 `npx tauri build`（CLI 会自动打开它）；
+# 需要手工编译发布版时，必须显式带上：
+#
+# ```text
+# cargo build --release --features custom-protocol
+# ```
+#
+# 千万不要把它设成默认 feature：`tauri dev` 依赖 dev 模式才能连上
+# dev server 做热更新，默认打开会直接让 `tauri dev` 失效。
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# `unstable` 提供多 WebView 能力（`WebviewBuilder` / `Window::add_child`）。
+# 本项目需要它来把「React 控制台」与「DSH 页面」放进同一个窗口的两个 WebView，
+# 从而保证主控制台永不因导航而卸载——这是诊断能力不消失的前提。
+# 详见 `src/chat.rs` 的模块文档。
+tauri = { version = "2", features = ["tray-icon", "unstable"] }
+tauri-plugin-opener = "2"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# 轻量 HTTP 客户端，用于就绪探测（不引入 tokio 全量运行时）。
+#
+# 注意默认特性里**带着 TLS**：本程序绝大多数请求只打 127.0.0.1，
+# 但「检查 DSH 更新」要查 npm registry（HTTPS），所以这块不能省。
+ureq = { version = "2.10", features = ["json"] }
+
+# DSH 的 host 事件流（WebSocket）—— 任务完成通知的判定依据。
+#
+# 只开 `handshake`：连接目标固定是本机 `ws://127.0.0.1:<port>`，
+# 不需要 TLS，省掉一个 native-tls/openssl 依赖。
+tungstenite = { version = "0.24", default-features = false, features = ["handshake"] }
+
+[target.'cfg(windows)'.dependencies]
+# 只启用真正用到的那几个 feature，避免把整个 Win32 绑定拖进来：
+# - Foundation: SYSTEMTIME 结构体、GetLastError / ERROR_ALREADY_EXISTS
+# - SystemInformation: GetLocalTime（日志取本地时间，因此不必引入 chrono）
+# - Threading: CreateMutexW（单实例保护，见 src/single_instance.rs）
+# - WindowsAndMessaging: FindWindowW / ShowWindow / MessageBoxW（唤回已有窗口）
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+# Windows 原生 toast（任务完成通知），见 src/notify.rs。
+# 不带 `tauri-plugin-notification`：那个插件是跨平台封装，在 Windows 上
+# 最终也走 winrt，但会额外引入一层插件与前端 API。本项目只需要
+# "从 Rust 侧发一条通知"这一个能力，直接用它更省。
+tauri-winrt-notification = "0.7"
+
+# 便携 exe 的自救：Windows **只**为"已注册 AppUserModelID"的进程显示 toast，
+# 而没有安装器就没有开始菜单快捷方式来完成这次注册——
+# 于是必须按微软文档的注册表替代方案自己写一份，否则 toast 会被静默丢弃
+# （不报错、不显示，最难查的那种失败）。见 notify::ensure_toast_aumid。
+winreg = "0.55"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

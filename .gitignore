@@ -1,0 +1,28 @@
+# 依赖
+node_modules/
+src-tauri/target/
+
+# 构建产物
+dist/
+*.exe
+*.msi
+*.nsis.zip
+
+# 运行时数据（绿色应用的数据目录，不应提交）
+dsh-shell-data/
+
+# 图标源图（由 tools/make_icon.py 生成）
+app-icon.png
+
+# 本地构建 / 实机验证产物（不入库）
+/release/
+scripts/dsh-server-log.txt
+
+# Tauri 构建时自动重新生成
+src-tauri/gen/schemas/
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
