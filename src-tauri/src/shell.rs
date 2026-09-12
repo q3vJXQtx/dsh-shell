@@ -93,6 +93,13 @@ struct Inner {
     data_dir: PathBuf,
     /// 用户是否主动停止了后端（退出应用时用）
     shutting_down: bool,
+    /// 复用外部实例模式下的访问地址（不带 token）。
+    ///
+    /// 依据：DSH 的 cookie 签名密钥持久化在 `DSH_HOME/auth/store.json`，
+    /// WebView2 的登录态（cookie）跨后端进程存活——因此即使端口上的
+    /// DSH 不是本程序拉起的（拿不到它的 launch token），只要 WebView2
+    /// 里还有有效登录态，直接导航到不带 token 的首页即可进入。
+    foreign_ready_url: Option<String>,
 }
 
 /// 编排层句柄，作为 Tauri 的托管状态
@@ -138,6 +145,7 @@ impl Shell {
                 settings_path,
                 data_dir,
                 shutting_down: false,
+                foreign_ready_url: None,
             }),
         }
     }
@@ -167,10 +175,33 @@ impl Shell {
         if !inner.backend.is_ready() {
             return None;
         }
+        // 复用外部实例模式：地址由 mark_foreign_ready 直接给定（不带 token）
+        if let Some(url) = &inner.foreign_ready_url {
+            return Some(url.clone());
+        }
         inner
             .token
             .as_ref()
             .map(|t| token::build_url(inner.settings.port, t))
+    }
+
+    /// 标记进入「复用外部实例」模式。
+    ///
+    /// 状态与自启动就绪相同（`Ready { owned: false }`），但访问地址由调用方
+    /// 直接给定（**不带 token**）——登录态依赖 WebView2 里此前的持久 cookie。
+    /// 同时清空 token：复用模式下既没有也拿不到本代 launch token，
+    /// 事件流监听器会保持等待（任务完成通知在此模式不可用，属已知取舍；
+    /// 要恢复请用「重启后端」，它会接管外部实例并由本程序自己拉起）。
+    pub fn mark_foreign_ready(app: &AppHandle, shell: &Shell, url: String, pid: Option<u32>) {
+        {
+            let mut inner = lock(&shell.inner);
+            inner.backend = BackendState::Ready { owned: false, pid };
+            inner.foreign_ready_url = Some(url);
+            inner.token = None;
+            inner.started_at = None;
+        }
+        // 走统一的 set_state：托盘提示文字与前端状态广播都不缺
+        set_state(app, shell, BackendState::Ready { owned: false, pid });
     }
 
     /// 监听端口
@@ -262,6 +293,9 @@ pub fn start_backend(app: &AppHandle, restart: bool) {
         inner.quick_deaths = 0;
         inner.token = None;
         inner.started_at = None;
+        // 退出复用模式（若有）：接下来要么自己拉起、要么进入失败态，
+        // 陈旧的复用地址不能残留在快照里
+        inner.foreign_ready_url = None;
         // 重启场景下先收掉旧进程，避免端口占用
         if restart {
             if let Some(mut c) = inner.child.take() {
@@ -269,6 +303,24 @@ pub fn start_backend(app: &AppHandle, restart: bool) {
                 logging::info("正在停止当前 DSH 进程", format!("PID {}", c.pid));
                 lifecycle::kill_tree(c.pid);
                 let _ = c.child.wait();
+            } else if let BackendState::Ready { owned: false, pid: Some(fpid) } =
+                inner.backend.clone()
+            {
+                // 复用模式下点「重启后端」等于接管：收掉外部实例（连同子进程），
+                // 等端口释放后由本程序自己拉起并取得 token
+                logging::warn(
+                    "正在接管：停止复用的 DSH 实例",
+                    format!("PID {fpid}（连同其子进程）"),
+                );
+                lifecycle::kill_tree(fpid);
+                let freed =
+                    lifecycle::wait_listen_released(inner.settings.port, std::time::Duration::from_secs(6));
+                if !freed {
+                    logging::error(
+                        "被接管的实例端口仍未释放",
+                        format!("端口 {}：对方可能还在退出中，下一步可能报端口占用", inner.settings.port),
+                    );
+                }
             }
         }
         inner.generation

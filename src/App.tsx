@@ -168,6 +168,24 @@ export default function App() {
     }
   }, [refresh]);
 
+  /**
+   * 复用端口上已有的 DSH 实例（不杀进程）。
+   *
+   * 依赖 WebView2 的持久登录态：DSH 的 cookie 签名密钥跨进程存活，
+   * 只要登录态有效，导航到不带 token 的首页即可进入。
+   * 代价是没有本代 token，任务完成通知在此模式不可用。
+   */
+  const reuse = useCallback(async () => {
+    setNotice(null);
+    try {
+      await invoke("reuse_foreign_dsh");
+    } catch (e) {
+      setNotice(typeof e === "string" ? e : String(e));
+    } finally {
+      await refresh();
+    }
+  }, [refresh]);
+
   const state = snap?.state;
   const isReady = state?.status === "ready";
   const busy = state?.status === "starting" || state?.status === "healing";
@@ -272,6 +290,7 @@ export default function App() {
                 onDiagnostics={() => setDiagOpen(true)}
                 onSettings={() => setSettingsOpen(true)}
                 onTakeover={takeover}
+                onReuse={reuse}
               />
             )}
             {(!state || state.status === "idle") && (

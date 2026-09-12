@@ -23,6 +23,7 @@ export default function FailurePanel({
   onDiagnostics,
   onSettings,
   onTakeover,
+  onReuse,
 }: {
   reason: FailureReason;
   onRetry: () => void;
@@ -30,12 +31,15 @@ export default function FailurePanel({
   onSettings: () => void;
   /** 仅「端口上已有别的 DSH」时需要；返回的 Promise 便于展示进行中状态 */
   onTakeover?: () => Promise<void>;
+  /** 仅「端口上已有别的 DSH」时需要：不动对方进程，借持久登录态直接进入 */
+  onReuse?: () => Promise<void>;
 }) {
   const view = failureView(reason);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const canTakeover = reason.kind === "foreignDshRunning" && !!onTakeover;
+  const canReuse = reason.kind === "foreignDshRunning" && !!onReuse;
 
   const doTakeover = async () => {
     if (!onTakeover) return;
@@ -47,6 +51,16 @@ export default function FailurePanel({
       // 若被再次渲染出来，按钮必须是可点的
       setBusy(false);
       setConfirming(false);
+    }
+  };
+
+  const doReuse = async () => {
+    if (!onReuse) return;
+    setBusy(true);
+    try {
+      await onReuse();
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -80,8 +94,15 @@ export default function FailurePanel({
       </ul>
 
       <div className="actions">
+        {/* 复用是非破坏性操作，无需二次确认，排在接管之前作为首选 */}
+        {canReuse && (
+          <button className="primary" onClick={() => void doReuse()} disabled={busy}>
+            {busy ? "正在进入…" : "复用实例（不重启）"}
+          </button>
+        )}
+
         {canTakeover && !confirming && (
-          <button className="primary" onClick={() => setConfirming(true)} disabled={busy}>
+          <button onClick={() => setConfirming(true)} disabled={busy}>
             接管并启动
           </button>
         )}

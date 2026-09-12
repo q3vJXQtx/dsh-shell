@@ -419,6 +419,55 @@ async fn takeover_foreign_dsh(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// 复用已在端口上运行的 DSH 实例：**不杀进程、不重启**。
+///
+/// # 为什么现在可以复用（而设计之初不行）
+///
+/// 当初「接管即杀」的前提是：拿不到外部实例的 launch token，
+/// 开窗口必然 401。但后来排查 token 失效问题时证实——DSH 的 cookie
+/// 签名密钥持久化在 `DSH_HOME/auth/store.json`，WebView2 的登录态
+/// （cookie）**跨后端进程存活**。所以只要 WebView2 里还有有效登录态，
+/// 直接导航到不带 token 的首页就能进，根本不必动用户的进程。
+///
+/// # 已知取舍
+///
+/// 复用模式没有本代 token：事件流订阅不上，**任务完成通知不可用**；
+/// 「重启后端」可随时切换回本程序托管（会接管外部实例）。
+/// 另外，若 WebView2 的登录态已过期/被清，页面会显示 401——
+/// 同样用「重启后端」恢复。
+#[tauri::command]
+async fn reuse_foreign_dsh(app: AppHandle) -> Result<(), String> {
+    let port = app.state::<Shell>().settings().port;
+
+    // 闸门：端口上得真的是 DSH（与接管同一道校验）
+    match probe::probe(port, None) {
+        probe::ProbeResult::Responding(kind) if kind.is_dsh() => {}
+        _ => {
+            return Err(format!(
+                "端口 {port} 上现在没有检测到 DSH，无法复用。它可能已经退出了，请点「重试」重新检测。"
+            ))
+        }
+    }
+
+    let pid = lifecycle::find_listening_pid(port);
+    let url = format!("http://127.0.0.1:{port}/");
+
+    Shell::mark_foreign_ready(&app, &app.state::<Shell>(), url.clone(), pid);
+
+    logging::info(
+        "复用已运行的 DSH 实例（未重启进程）",
+        format!(
+            "PID {} · {url}（此模式无访问 token：任务完成通知不可用；要恢复请用「重启后端」）",
+            pid.map(|p| p.to_string()).unwrap_or_else(|| "未知".into())
+        ),
+    );
+
+    // 与正常就绪走同一条事件：前端拿 URL 去 chat_load
+    use tauri::Emitter;
+    let _ = app.emit("shell://ready", url);
+    Ok(())
+}
+
 // ---- 聊天视图相关 --------------------------------------------------------
 
 /// 上报聊天视图应占据的矩形区域
@@ -590,6 +639,7 @@ pub fn run() {
             start_backend,
             stop_backend,
             takeover_foreign_dsh,
+            reuse_foreign_dsh,
             export_diagnostics,
             save_diagnostics,
             get_settings,
