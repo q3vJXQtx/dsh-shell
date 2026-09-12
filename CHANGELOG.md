@@ -7,6 +7,21 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-12
+
+### Added
+
+- **复用外部 DSH 实例** —— 端口上已有自己启动的 `dsh web` 时，失败面板新增
+  首选项「复用实例（不重启）」：不终止对方进程，借 WebView2 的持久登录态
+  （cookie 签名密钥存于 `DSH_HOME/auth/store.json`，跨后端进程存活）直接
+  导航进入。已知取舍：复用模式没有本代 token，任务完成通知不可用；
+  随时「重启后端」即接管回托管模式
+- **新应用图标** —— 深蓝鲸鱼 🐳，全平台图标组已重新生成
+
+### Changed
+
+- 失败面板中「接管并启动」降为次选：非破坏性的「复用」排前且免二次确认
+
 ## [0.1.0] - 2026-09-11
 
 首个公开版本。
@@ -38,5 +53,6 @@
 - 访问 token 仅存在于内存，日志与诊断报告一律打码
 - Tauri capability 最小授权 + 运行时守卫测试锁定（详见 `docs/DESIGN.md`）
 
-[Unreleased]: https://github.com/q3vJXQtx/dsh-shell/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/q3vJXQtx/dsh-shell/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/q3vJXQtx/dsh-shell/releases/tag/v0.2.0
 [0.1.0]: https://github.com/q3vJXQtx/dsh-shell/releases/tag/v0.1.0
