@@ -78,3 +78,15 @@ jobs:
           releaseName: "DSH Shell ${{ github.ref_name }}"
           releaseDraft: true
           prerelease: false
+
+      # tauri 官方没有 "portable" bundle 目标；但 tauri build 产出的
+      # 裸 exe 本身就是可独立运行的便携版（应用会自动检测并进入便携模式）。
+      # 这里把它改名后直接挂到同一个 Release 上。
+      - name: Attach portable exe to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          asset="DSH.Shell_${GITHUB_REF_NAME#v}_x64-portable.exe"
+          cp src-tauri/target/release/dsh-shell.exe "$asset"
+          gh release upload "$GITHUB_REF_NAME" "$asset" --clobber
