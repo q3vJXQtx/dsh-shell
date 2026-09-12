@@ -38,9 +38,8 @@
 从 [Releases](https://github.com/q3vJXQtx/dsh-shell/releases) 下载：
 
 - **安装版** `DSH.Shell_0.1.0_x64-setup.exe` —— NSIS，CurrentUser 安装、不需要管理员权限
-
-想要便携版（exe 直接放任何文件夹跑）：自行构建后取
-`src-tauri/target/release/dsh-shell.exe` 即可，应用会自动进入便携模式。
+- **便携版** `DSH.Shell_0.1.0_x64-portable.zip` —— 解压到任意文件夹直接双击 exe 运行，
+  数据落在解压目录旁的 `dsh-shell-data/`，删目录即恢复出厂
 
 首次运行如果出现 SmartScreen 提示「Windows 已保护你的电脑」：
 点「更多信息」→「仍要运行」（未做代码签名，属正常现象）。

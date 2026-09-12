@@ -30,7 +30,8 @@
   （含预发布后缀）、代理回退链，命中时给出复制即用的升级命令
 - **诊断导出** —— 状态 / 日志 / 设置 / 进程与命令行 / 运行时目录聚合一份报告落盘
 - **CI** —— GitHub Actions：`main`/PR 自动构建与测试；`v*` tag 产出
-  NSIS 安装包（`DSH.Shell_<版本>_x64-setup.exe`）并创建 draft Release
+  NSIS 安装包（`DSH.Shell_<版本>_x64-setup.exe`）与便携版
+  （`DSH.Shell_<版本>_x64-portable.zip`），并创建 draft Release
 
 ### Security
 
